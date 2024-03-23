@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的小程序</title>
+    <link rel="stylesheet" href="styles.css">
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-size: cover;
+            background-position: center;
+            transition: background-image 0.5s ease-in-out;
+        }
+        
+        .container {
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        
+        h1 {
+            text-align: center;
+        }
+        
+        input[type="text"],
+        input[type="password"],
+        textarea,
+        button {
+            display: block;
+            width: 100%;
+            margin: 10px 0;
+            padding: 10px;
+        }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        .error {
+            color: red;
+            text-align: center;
+        }
+        
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>我的小程序</h1>
+        <div id="loginForm">
+            <h2>登录</h2>
+            <input type="text" id="username" placeholder="用户名">
+            <input type="password" id="password" placeholder="密码">
+            <button onclick="login()">登录</button>
+            <button onclick="showRegisterForm()">注册新用户</button>
+            <p id="errorMsg" class="error"></p>
+        </div>
+        <div id="registerForm" style="display: none;">
+            <h2>注册新用户</h2>
+            <input type="text" id="newUsername" placeholder="新用户名">
+            <input type="password" id="newPassword" placeholder="新密码">
+            <button onclick="register()">注册</button>
+            <button onclick="cancelRegister()">取消</button>
+            <p id="registerErrorMsg" class="error"></p>
+        </div>
+        <div id="mainPage" style="display: none;">
+            <div id="dateDisplay"></div>
+            <button onclick="showAddTaskForm()">添加任务</button>
+            <!-- 新增账号设置按钮 -->
+            <button onclick="showAccountForm()">账号设置</button>
+            <div id="addTaskForm" style="display: none;">
+                <h2>添加/编辑任务</h2>
+                <input type="hidden" id="taskId">
+                <input type="text" id="taskName" placeholder="任务名称">
+                <textarea id="taskDescription" placeholder="任务描述"></textarea>
+                <button id="saveTaskButton" onclick="saveTask()">保存</button>
+                <button id="cancelEditButton" style="display: none;" onclick="cancelEdit()">取消编辑</button>
+            </div>
+            <div id="taskList">
+                <!-- 任务列表将通过 JavaScript 动态生成 -->
+            </div>
+            <button onclick="logout()">退出登录</button>
+        </div>
+        <!-- 新增账号设置界面 -->
+        <div id="accountForm" style="display: none;">
+            <h2>账号设置</h2>
+            <label for="avatar">头像：</label>
+            <input type="text" id="avatar" placeholder="头像链接">
+            <label for="name">名称：</label>
+            <input type="text" id="name" placeholder="名称">
+            <label for="background">背景：</label>
+            <input type="text" id="background" placeholder="背景链接">
+            <button onclick="saveAccount()">保存设置</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+
+    <script>
+        // 全局变量
+        let loggedIn = false;
+        let tasks = [];
+        let currentUser = null; // 新增当前用户变量
+        
+        // 初始化用户信息
+        let users = [
+            { username: "admin", password: "password", avatar: "", name: "Admin", background: "" }
+        ];
+        
+        function formatDate(date) {
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            return date.toLocaleDateString('en-US', options);
+        }
+        
+        function showDate() {
+            const dateDisplay = document.getElementById('dateDisplay');
+            const currentDate = new Date();
+            dateDisplay.textContent = '今天是：' + formatDate(currentDate);
+        }
+        
+        function login() {
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+        
+            // 查找用户
+            const user = users.find(u => u.username === username && u.password === password);
+            if (user) {
+                loggedIn = true;
+                currentUser = user; // 设置当前用户
+                document.getElementById("loginForm").style.display = "none";
+                document.getElementById("mainPage").style.display = "block";
+                showDate();
+                displayTasks();
+                setMainPageBackground(user.background); // 设置主页背景
+            } else {
+                document.getElementById("errorMsg").textContent = "用户名或密码错误";
+            }
+        }
+        
+        function logout() {
+            loggedIn = false;
+            currentUser = null; // 清除当前用户信息
+            document.getElementById("loginForm").style.display = "block";
+            document.getElementById("registerForm").style.display = "none";
+            document.getElementById("accountForm").style.display = "none"; // 隐藏账号设置界面
+            document.getElementById("mainPage").style.display = "none";
+        }
+        
+        function showRegisterForm() {
+            document.getElementById("loginForm").style.display = "none";
+            document.getElementById("registerForm").style.display = "block";
+            document.getElementById("errorMsg").textContent = "";
+        }
+        
+        function cancelRegister() {
+            document.getElementById("registerForm").style.display = "none";
+            document.getElementById("loginForm").style.display = "block";
+            document.getElementById("newUsername").value = "";
+            document.getElementById("newPassword").value = "";
+            document.getElementById("registerErrorMsg").textContent = "";
+        }
+        
+        function register() {
+            const newUsername = document.getElementById("newUsername").value;
+            const newPassword = document.getElementById("newPassword").value;
+        
+            if (newUsername.trim() !== "" && newPassword.trim() !== "") {
+                // 检查用户名是否已存在
+                const existingUser = users.find(u => u.username === newUsername);
+                if (existingUser) {
+                    document.getElementById("registerErrorMsg").textContent = "用户名已存在";
+                } else {
+                    // 添加新用户
+                    users.push({ username: newUsername, password: newPassword, avatar: "", name: newUsername, background: "" });
+                    alert("注册成功，请登录");
+                    cancelRegister(); // 取消注册界面显示
+                }
+            } else {
+                document.getElementById("registerErrorMsg").textContent = "用户名和密码不能为空";
+            }
+        }
+        
+        // 新增函数：显示账号设置界面
+        function showAccountForm() {
+            if (loggedIn && currentUser) {
+                document.getElementById("mainPage").style.display = "none";
+                document.getElementById("accountForm").style.display = "block";
+                // 填充账号设置表单
+                document.getElementById("avatar").value = currentUser.avatar;
+                document.getElementById("name").value = currentUser.name;
+                document.getElementById("background").value = currentUser.background;
+            }
+        }
+        
+        // 新增函数：保存账号设置
+        function saveAccount() {
+            if (loggedIn && currentUser) {
+                // 更新当前用户信息
+                currentUser.avatar = document.getElementById("avatar").value;
+                currentUser.name = document.getElementById("name").value;
+                currentUser.background = document.getElementById("background").value;
+                // 提示保存成功
+                alert("账号设置已保存");
+                // 返回主页并显示
+                document.getElementById("accountForm").style.display = "none";
+                document.getElementById("mainPage").style.display = "block";
+                setMainPageBackground(currentUser.background); // 设置主页背景
+            }
+        }
+        
+        // 新增函数：设置主页背景
+        function setMainPageBackground(backgroundUrl) {
+            document.body.style.backgroundImage = `url('${backgroundUrl}')`;
+        }
+        
+        function showAddTaskForm() {
+            document.getElementById("addTaskForm").style.display = "block";
+            document.getElementById("saveTaskButton").textContent = "添加任务";
+            document.getElementById("cancelEditButton").style.display = "none";
+            clearTaskForm();
+        }
+        
+        function clearTaskForm() {
+            document.getElementById("taskId").value = "";
+            document.getElementById("taskName").value = "";
+            document.getElementById("taskDescription").value = "";
+        }
+        
+        function saveTask() {
+            const taskId = document.getElementById("taskId").value;
+            const taskName = document.getElementById("taskName").value;
+            const taskDescription = document.getElementById("taskDescription").value;
+        
+            if (taskName.trim() !== "") {
+                if (taskId !== "") {
+                                // 编辑任务
+                    const index = tasks.findIndex(task => task.id === taskId);
+                    if (index !== -1) {
+                        tasks[index].name = taskName;
+                        tasks[index].description = taskDescription;
+                    }
+                } else {
+                    // 添加任务
+                    const task = {
+                        id: Date.now().toString(), // 使用时间戳作为唯一ID
+                        name: taskName,
+                        description: taskDescription
+                    };
+                    tasks.push(task);
+                }
+                displayTasks();
+                document.getElementById("addTaskForm").style.display = "none";
+                clearTaskForm();
+            } else {
+                alert("任务名称不能为空");
+            }
+        }
+        
+        function editTask(taskId) {
+            const task = tasks.find(task => task.id === taskId);
+            if (task) {
+                document.getElementById("taskId").value = task.id;
+                document.getElementById("taskName").value = task.name;
+                document.getElementById("taskDescription").value = task.description;
+                document.getElementById("saveTaskButton").textContent = "保存编辑";
+                document.getElementById("cancelEditButton").style.display = "block";
+                document.getElementById("addTaskForm").style.display = "block";
+            }
+        }
+        
+        function deleteTask(taskId) {
+            const index = tasks.findIndex(task => task.id === taskId);
+            if (index !== -1) {
+                tasks.splice(index, 1);
+                displayTasks();
+            }
+        }
+        
+        function cancelEdit() {
+            clearTaskForm();
+            document.getElementById("addTaskForm").style.display = "none";
+        }
+        
+        function displayTasks() {
+            const taskListDiv = document.getElementById("taskList");
+            taskListDiv.innerHTML = "";
+        
+            tasks.forEach(task => {
+                const taskDiv = document.createElement("div");
+                taskDiv.classList.add("task");
+        
+                const taskNamePara = document.createElement("p");
+                taskNamePara.textContent = task.name;
+                taskDiv.appendChild(taskNamePara);
+        
+                const taskDescriptionPara = document.createElement("p");
+                taskDescriptionPara.textContent = task.description;
+                taskDiv.appendChild(taskDescriptionPara);
+        
+                const editButton = document.createElement("button");
+                editButton.textContent = "编辑";
+                editButton.onclick = () => editTask(task.id);
+                taskDiv.appendChild(editButton);
+        
+                const deleteButton = document.createElement("button");
+                deleteButton.textContent = "删除";
+                deleteButton.onclick = () => deleteTask(task.id);
+                taskDiv.appendChild(deleteButton);
+        
+                taskListDiv.appendChild(taskDiv);
+            });
+        }
+        
+        
+    </script>
+</body>
+
+</html>
